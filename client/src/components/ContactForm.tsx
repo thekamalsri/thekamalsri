@@ -13,6 +13,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import {
   Select,
@@ -21,7 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Send } from "lucide-react";
+import { Send, Upload, X, FileText } from "lucide-react";
+
+const MAX_FILE_SIZE = 500 * 1024; // 500KB - EmailJS limit
+const ACCEPTED_FILE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+];
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -35,6 +43,8 @@ type FormData = z.infer<typeof formSchema>;
 
 export default function ContactForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string>("");
   const { toast } = useToast();
 
   const form = useForm<FormData>({
@@ -48,12 +58,48 @@ export default function ContactForm() {
     },
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setFileError("");
+    
+    if (!file) {
+      setCvFile(null);
+      return;
+    }
+
+    // Validate file type
+    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+      setFileError("Please upload a PDF or Word document (.pdf, .doc, .docx)");
+      setCvFile(null);
+      return;
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      setFileError("File size must be less than 500KB");
+      setCvFile(null);
+      return;
+    }
+
+    setCvFile(file);
+  };
+
+  const removeFile = () => {
+    setCvFile(null);
+    setFileError("");
+    const fileInput = document.getElementById('cv-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
+  };
+
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true);
     
-    // TODO: Integrate with EmailJS or Formspree
+    // TODO: Integrate with EmailJS
     // For now, simulate submission
     console.log("Form submitted:", data);
+    if (cvFile) {
+      console.log("CV file attached:", cvFile.name);
+    }
     
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -64,6 +110,10 @@ export default function ContactForm() {
     });
     
     form.reset();
+    setCvFile(null);
+    setFileError("");
+    const fileInput = document.getElementById('cv-upload') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
     setIsSubmitting(false);
   };
 
@@ -183,6 +233,64 @@ export default function ContactForm() {
                   </FormItem>
                 )}
               />
+
+              <div className="space-y-2">
+                <FormLabel>Upload CV (Optional)</FormLabel>
+                <FormDescription className="text-sm text-muted-foreground">
+                  Upload your CV in PDF or Word format (max 500KB)
+                </FormDescription>
+                
+                {!cvFile ? (
+                  <div className="relative">
+                    <Input
+                      id="cv-upload"
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      data-testid="input-cv-file"
+                    />
+                    <label htmlFor="cv-upload">
+                      <div className="border-2 border-dashed border-input rounded-lg p-6 text-center cursor-pointer hover-elevate transition-colors">
+                        <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          Click to upload or drag and drop
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          PDF, DOC, DOCX (max 500KB)
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="border border-border rounded-lg p-4 flex items-center justify-between" data-testid="file-preview">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-md bg-primary/10">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{cvFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(cvFile.size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={removeFile}
+                      data-testid="button-remove-file"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                
+                {fileError && (
+                  <p className="text-sm text-destructive" data-testid="text-file-error">{fileError}</p>
+                )}
+              </div>
 
               <Button 
                 type="submit" 
